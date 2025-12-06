@@ -21,21 +21,29 @@ const (
 	defaultGHCRMirror = "ghcr.1ms.run"
 )
 
+var (
+	defaultGHCRMirrors = []string{defaultGHCRMirror}
+	// GHCRMirrorSelector, when set, is used to obtain user preferred registry mirrors before attempting a download.
+	GHCRMirrorSelector func(ctx context.Context, reference string) ([]string, error)
+)
+
 func downloadWindowsFromGHCR(ctx context.Context, isoPath string, version int, edition string) (string, error) {
 	ref, err := ghcrWindowsReference(version, edition)
 	if err != nil {
 		return "", err
 	}
 
-	mirror := strings.TrimSpace(os.Getenv("FASTPVE_GHCR_MIRROR"))
-	if mirror == "" {
-		mirror = defaultGHCRMirror
+	mirrors := defaultGHCRMirrors
+	if GHCRMirrorSelector != nil {
+		selected, err := GHCRMirrorSelector(ctx, ref)
+		if err != nil {
+			return "", err
+		}
+		if selected != nil {
+			mirrors = selected
+		}
 	}
-	var refs []string
-	if mirror != "" {
-		refs = append(refs, swapRegistryHost(ref, mirror))
-	}
-	refs = append(refs, ref)
+	refs := buildGHCRReferences(ref, mirrors)
 
 	var lastErr error
 	for _, candidate := range refs {
@@ -155,6 +163,7 @@ func swapRegistryHost(reference, host string) string {
 	if host == "" {
 		return reference
 	}
+	host = strings.TrimSpace(host)
 	refHost, repo, tag, err := parseRegistryReference(reference)
 	if err != nil {
 		return reference
@@ -163,6 +172,27 @@ func swapRegistryHost(reference, host string) string {
 		return reference
 	}
 	return fmt.Sprintf("%s/%s:%s", host, repo, tag)
+}
+
+func buildGHCRReferences(ref string, mirrors []string) []string {
+	refs := make([]string, 0, len(mirrors)+1)
+	seen := make(map[string]struct{}, len(mirrors)+1)
+	for _, mirror := range mirrors {
+		mirror = strings.TrimSpace(mirror)
+		if mirror == "" {
+			continue
+		}
+		candidate := swapRegistryHost(ref, mirror)
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		refs = append(refs, candidate)
+	}
+	if _, ok := seen[ref]; !ok {
+		refs = append(refs, ref)
+	}
+	return refs
 }
 
 func ghcrWindowsReference(version int, edition string) (string, error) {

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/linkease/fastpve/downloader"
 	"github.com/linkease/fastpve/quickget"
@@ -53,6 +54,7 @@ func promptInstallWindows() error {
 	downer := newDownloader()
 	statusPath := filepath.Join(cachePath, "windows_install.ops")
 	status, _ := vmdownloader.IsStatusValid(downer, statusPath)
+	registerGHCRMirrorPrompt()
 
 	var windows []string
 	var virtio []string
@@ -356,6 +358,53 @@ func promptWinDownloadInstall(info *windowsInstallInfo, needDownload bool) (bool
 		}
 	}
 	return false, nil
+}
+
+var (
+	ghcrMirrorOnce sync.Once
+	ghcrMirrors    []string
+	ghcrMirrorErr  error
+)
+
+func registerGHCRMirrorPrompt() {
+	vmdownloader.GHCRMirrorSelector = func(ctx context.Context, reference string) ([]string, error) {
+		ghcrMirrorOnce.Do(func() {
+			ghcrMirrors, ghcrMirrorErr = promptGHCRMirrors()
+		})
+		if ghcrMirrorErr != nil {
+			return nil, ghcrMirrorErr
+		}
+		return ghcrMirrors, nil
+	}
+}
+
+func promptGHCRMirrors() ([]string, error) {
+	options := []string{
+		"ghcr.1ms.run（默认，自动回退官方）",
+		"ghcr.nju.edu.cn（自动回退官方）",
+		"ghcr.linkease.net:5443（需安装 KSpeeder，最快）",
+		"ghcr.io（仅使用官方）",
+	}
+	prompt := promptui.Select{
+		Label: "选择 GHCR 镜像源（用于 GHCR 备份下载）",
+		Items: options,
+	}
+	idx, _, err := prompt.Run()
+	if err != nil {
+		return nil, err
+	}
+	switch idx {
+	case 0:
+		return []string{"ghcr.1ms.run"}, nil
+	case 1:
+		return []string{"ghcr.nju.edu.cn"}, nil
+	case 2:
+		return []string{"ghcr.linkease.net:5443"}, nil
+	case 3:
+		return []string{}, nil
+	default:
+		return nil, nil
+	}
 }
 
 func createWindowVM(ctx context.Context, info *windowsInstallInfo) error {
