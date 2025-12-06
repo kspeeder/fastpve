@@ -178,12 +178,15 @@ func ghcrWindowsReference(version int, edition string) (string, error) {
 		}
 		return "ghcr.io/kspeeder/win10x64:cn_simplified", nil
 	case Win7:
-		// Only English Enterprise available for Win7 package.
-		if edition != "" && !strings.EqualFold(edition, "English Enterprise") {
-			return "", fmt.Errorf("GHCR Windows 7 仅支持 English Enterprise")
+		edition = strings.TrimSpace(edition)
+		switch {
+		case edition == "" || strings.EqualFold(edition, "English Enterprise"):
+			return "ghcr.io/kspeeder/win7x64:en_enterprise", nil
+		case strings.EqualFold(edition, "Chinese (Simplified)") || strings.EqualFold(edition, "Chinese (Simplified) x64"):
+			return "ghcr.io/kspeeder/win7x64:cn_simplified", nil
+		default:
+			return "", fmt.Errorf("GHCR Windows 7 仅支持 English Enterprise 或 Chinese (Simplified)")
 		}
-		edition = "English Enterprise"
-		return "ghcr.io/kspeeder/win7x64:en_enterprise", nil
 	default:
 		return "", fmt.Errorf("unsupported Windows version for GHCR: %d", version)
 	}

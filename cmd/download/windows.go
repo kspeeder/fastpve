@@ -16,11 +16,11 @@ import (
 func windowsCommand() *cli.Command {
 	return &cli.Command{
 		Name:  "windows",
-		Usage: "Download Windows 10/11 ISO",
+		Usage: "Download Windows 7/10/11 ISO",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:    "version",
-				Usage:   "Windows version: 10 or 11",
+				Usage:   "Windows version: 7, 10 or 11",
 				Value:   "11",
 				Aliases: []string{"v"},
 			},
@@ -85,7 +85,7 @@ func downloadWindows(ctx context.Context, cmd *cli.Command) error {
 	}
 	edition := strings.TrimSpace(cmd.String("edition"))
 	if version == Win7 && edition == "" {
-		edition = "English Enterprise"
+		edition = "Chinese (Simplified)"
 	}
 	if edition == "" {
 		return errors.New("edition is required")

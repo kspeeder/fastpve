@@ -25,6 +25,11 @@ var winEditions = []string{
 	"English Enterprise",
 }
 
+var win7Editions = []string{
+	"Chinese (Simplified) x64",
+	"English Enterprise",
+}
+
 const (
 	Win11 = iota
 	Win10
@@ -34,7 +39,7 @@ const (
 type windowsInstallInfo struct {
 	WindowISO    string `json:"windowISO"`
 	VirtIO       string `json:"virtio"`
-	WinVersion   int    `json:"winVersion"` // 0:11, 1:10
+	WinVersion   int    `json:"winVersion"` // 0:11, 1:10, 2:7
 	WinEdition   int    `json:"winEdition"`
 	Memory       int    `json:"memory"`
 	Cores        int    `json:"cores"`
@@ -148,7 +153,11 @@ func promptInstallWindows() error {
 		}
 	}
 	if info.WinVersion >= 0 && info.WinEdition >= 0 {
-		info.WindowISO, err = vmdownloader.DownloadWindowsISO(ctx, downer, quickGet, isoPath, statusPath, status, info.WinVersion, winEditions[info.WinEdition])
+		editionName, err := selectedEdition(info)
+		if err != nil {
+			return err
+		}
+		info.WindowISO, err = vmdownloader.DownloadWindowsISO(ctx, downer, quickGet, isoPath, statusPath, status, info.WinVersion, editionName)
 		if err != nil {
 			return err
 		}
@@ -210,7 +219,7 @@ func promptWinFiles(info *windowsInstallInfo,
 	}{
 		{"全新下载 Windows11", Win11},
 		{"全新下载 Windows10", Win10},
-		{"全新下载 Windows7 (Enterprise 英文)", Win7},
+		{"全新下载 Windows7 (支持简体/英文)", Win7},
 	}
 	startNew := len(windows)
 	for _, opt := range newOptions {
@@ -234,12 +243,15 @@ func promptWinFiles(info *windowsInstallInfo,
 		opt := newOptions[idx-startNew]
 		info.WinVersion = opt.Version
 		if opt.Version == Win7 {
-			info.WinEdition = findEditionIndex("English Enterprise")
+			err = promptWin7Edition(info)
 		} else {
 			err = promptWinEdition(info)
 			if err != nil {
 				return err
 			}
+		}
+		if err != nil {
+			return err
 		}
 	} else {
 		// Should not reach.
@@ -256,15 +268,15 @@ func promptWinFiles(info *windowsInstallInfo,
 		}
 		info.WinVersion = idx
 		if info.WinVersion == Win7 && info.WinEdition < 0 {
-			info.WinEdition = findEditionIndex("English Enterprise")
+			info.WinEdition = findEditionIndex(win7Editions, "Chinese (Simplified) x64")
 		}
 	}
 
 	return nil
 }
 
-func findEditionIndex(name string) int {
-	for i, v := range winEditions {
+func findEditionIndex(options []string, name string) int {
+	for i, v := range options {
 		if v == name {
 			return i
 		}
@@ -272,17 +284,47 @@ func findEditionIndex(name string) int {
 	return -1
 }
 
-func promptWinEdition(info *windowsInstallInfo) error {
-	prompt := promptui.Select{
-		Label: "Windows版本语言",
-		Items: winEditions,
+func selectedEdition(info *windowsInstallInfo) (string, error) {
+	if info.WinEdition < 0 {
+		return "", errors.New("未选择 Windows 版本语言")
 	}
-	idx, _, err := prompt.Run()
+	if info.WinVersion == Win7 {
+		if info.WinEdition >= len(win7Editions) {
+			return "", fmt.Errorf("无效的 Windows 7 版本选项: %d", info.WinEdition)
+		}
+		return win7Editions[info.WinEdition], nil
+	}
+	if info.WinEdition >= len(winEditions) {
+		return "", fmt.Errorf("无效的 Windows 版本选项: %d", info.WinEdition)
+	}
+	return winEditions[info.WinEdition], nil
+}
+
+func promptWinEdition(info *windowsInstallInfo) error {
+	idx, err := promptEdition("Windows版本语言", winEditions)
 	if err != nil {
 		return err
 	}
 	info.WinEdition = idx
 	return nil
+}
+
+func promptWin7Edition(info *windowsInstallInfo) error {
+	idx, err := promptEdition("Windows 7 语言/架构", win7Editions)
+	if err != nil {
+		return err
+	}
+	info.WinEdition = idx
+	return nil
+}
+
+func promptEdition(label string, editions []string) (int, error) {
+	prompt := promptui.Select{
+		Label: label,
+		Items: editions,
+	}
+	idx, _, err := prompt.Run()
+	return idx, err
 }
 
 func promptWinDownloadInstall(info *windowsInstallInfo, needDownload bool) (bool, error) {
