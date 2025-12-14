@@ -468,7 +468,7 @@ func createWindowVM(ctx context.Context, info *windowsInstallInfo) error {
 		scripts = append(scripts, fmt.Sprintf("qm set $VMID -efidisk0 %s:1,format=raw,efitype=4m,pre-enrolled-keys=1", useDisk))
 	}
 	scripts = append(scripts,
-		fmt.Sprintf("qm set $VMID --scsi0 %s:64", useDisk),
+		fmt.Sprintf("qm set $VMID --scsi0 %s:%d", useDisk, info.Disk),
 		fmt.Sprintf(`qm set $VMID --ide0 local:iso/%s,media=cdrom`, winName),
 		fmt.Sprintf(`qm set $VMID --ide1 local:iso/%s,media=cdrom`, filepath.Base(info.VirtIO)),
 		`qm set $VMID --boot order='scsi0;ide0;ide1'`,
