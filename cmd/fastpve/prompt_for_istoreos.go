@@ -237,9 +237,11 @@ func createIstoreVM(ctx context.Context, isoPath string, info *istoreInstallInfo
 		return errors.New("VM creation failed")
 	}
 	fmt.Println("创建虚拟机：", vmid, "成功")
-	err = utils.BatchRun(ctx, []string{fmt.Sprintf("qm start %d", vmid)}, 0)
-	if err == nil {
-		fmt.Println("启动虚拟机成功：", vmid)
-	}
+
+	// 不启动虚拟机
+	//err = utils.BatchRun(ctx, []string{fmt.Sprintf("qm start %d", vmid)}, 0)
+	//if err == nil {
+	//	fmt.Println("启动虚拟机成功：", vmid)
+	//}
 	return err
 }
